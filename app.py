@@ -1,63 +1,78 @@
-import logging
-from queue import Queue
-from threading import Thread
-from telegram import Bot
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Updater, Filters
+import requests
+import datetime
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-logger = logging.getLogger(__name__)
-TOKEN = '337200725:AAFbDoHN6Do7nZyW7F3X2EEYcLKh358gWDA'
+class BotHandler:
+
+    def __init__(self, token):
+        self.token = token
+        self.api_url = "https://api.telegram.org/bot{}/".format(token)
+
+    def get_updates(self, offset=None, timeout=30):
+        method = 'getUpdates'
+        params = {'timeout': timeout, 'offset': offset}
+        resp = requests.get(self.api_url + method, params)
+        result_json = resp.json()['result']
+        return result_json
+
+    def send_message(self, chat_id, text):
+        params = {'chat_id': chat_id, 'text': text}
+        method = 'sendMessage'
+        resp = requests.post(self.api_url + method, params)
+        return resp
+
+    def delete_message(self , chat_id , MID):
+        #https://api.telegram.org/botTOKEN/deleteMessage?chat_id=CID&message_id=MID
+        params = {'chat_id': chat_id, 'message_id': MID}
+        method = 'deleteMessage'
+        resp = requests.post(self.api_url + method ,params)
+        return resp
+
+    def get_last_update(self):
+        get_result = self.get_updates()
+
+        if len(get_result) > 0:
+            last_update = get_result[-1]
+        else:
+            last_update = get_result[len(get_result)]
+
+        return last_update
+
+greet_bot = BotHandler("337200725:AAFbDoHN6Do7nZyW7F3X2EEYcLKh358gWDA")
+#greetings = ('hello', 'hi', 'greetings', 'sup')
+#now = datetime.datetime.now()
 
 
-def start(bot, update):
-    update.message.reply_text('welcome MESSAGE')
+def main():
+    new_offset = None
+    #today = now.day
+    #hour = now.hour
 
 
-def help(bot, update):
-    update.message.reply_text('help message')
+    greet_bot.get_updates(new_offset)
 
+    last_update = greet_bot.get_last_update()
 
-def echo(bot, update):
-    update.message.reply_text(update.message.text)
-
-
-def error(bot, update, error):
-    logger.warning('Update "%s" caused error "%s"' % (update, error))
-
-# Write your handlers here
-
-
-def setup(webhook_url=None):
-    """If webhook_url is not passed, run with long-polling."""
-    logging.basicConfig(level=logging.WARNING)
-    if webhook_url:
-        bot = Bot(TOKEN)
-        update_queue = Queue()
-        dp = Dispatcher(bot, update_queue)
-    else:
-        updater = Updater(TOKEN)
-        bot = updater.bot
-        dp = updater.dispatcher
-        dp.add_handler(CommandHandler("start", start))
-        dp.add_handler(CommandHandler("help", help))
-
-        # on noncommand i.e message - echo the message on Telegram
-        dp.add_handler(MessageHandler(Filters.text, echo))
-
-        # log all errors
-        dp.add_error_handler(error)
-    # Add your handlers here
-    if webhook_url:
-        bot.set_webhook(webhook_url=webhook_url)
-        thread = Thread(target=dp.start, name='dispatcher')
-        thread.start()
-        return update_queue, bot
-    else:
-        bot.set_webhook()  # Delete webhook
-        updater.start_polling()
-        updater.idle()
+    last_update_id = last_update['update_id']
+    #print(last_update_id)
+    last_message_id = last_update['message']['message_id']
+    print(last_message_id)
+    last_chat_text = last_update['message']['text']
+    print(last_chat_text)
+    last_chat_id = last_update['message']['chat']['id']
+    print(last_chat_id)
+    last_chat_name = last_update['message']['from']['first_name']
+    print(last_chat_name)
+    #greet_bot.send_message(last_chat_id, 'Good Evening  {}'.format(last_chat_name))
+    last_entity_type = last_update ['message']['entities'][0]['type']
+    if last_entity_type=='url' :
+        print('ok')
+        greet_bot.delete_message(last_chat_id, last_message_id)
+    print(greet_bot.delete_message(last_chat_id , last_message_id))
+    #greet_bot.delete_message(last_chat_id, last_message_id)
 
 
 if __name__ == '__main__':
-    setup()
+    try:
+        main()
+    except KeyboardInterrupt:
+        exit()
